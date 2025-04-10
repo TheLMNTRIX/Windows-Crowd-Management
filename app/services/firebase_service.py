@@ -25,7 +25,7 @@ class FirebaseService:
         # Initialize Firebase with service account
         try:
             logger.info("Initializing Firebase service")
-            cred_path = os.path.join(os.getcwd(), "techyothon-456411-firebase-adminsdk-fbsvc-87bbf09d02.json")
+            cred_path = os.path.join(os.getcwd(), "firebase-credentials.json")
             cred = credentials.Certificate(cred_path)
             firebase_admin.initialize_app(cred, {
                 'storageBucket': 'techyothon-456411.firebasestorage.app'

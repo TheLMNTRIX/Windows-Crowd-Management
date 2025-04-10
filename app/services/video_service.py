@@ -4,7 +4,7 @@ import uuid
 import numpy as np
 from PIL import Image, ImageDraw
 from datetime import datetime
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Any
 import json
 
 from app.config import settings
@@ -200,3 +200,47 @@ class VideoProcessor:
         out.release()
         
         return f"/static/processed/{output_filename}"
+    
+    @staticmethod
+    def analyze_video_with_stream(video_path: str, ai_service, max_frames: int = 100) -> Tuple[List[np.ndarray], List[Dict[str, Any]], float]:
+        """
+        Analyze video using video stream approach instead of frame extraction
+        
+        Args:
+            video_path: Path to video file
+            ai_service: Instance of AIService with crowd_counter
+            max_frames: Maximum number of frames to process
+            
+        Returns:
+            processed_frames: List of processed frames with annotations
+            crowd_results: List of crowd analysis results for each processed frame
+            duration: Video duration in seconds
+        """
+        cap = cv2.VideoCapture(video_path)
+        if not cap.isOpened():
+            raise ValueError(f"Failed to open video file: {video_path}")
+        
+        # Get video properties
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        duration = total_frames / fps
+        
+        # Calculate frame processing rate (don't process every frame)
+        process_every_n = max(1, total_frames // max_frames)
+        
+        processed_frames = []
+        crowd_results = []
+        
+        # Use the same analyze_video_stream method as in livestream
+        for frame, result in ai_service.crowd_counter.analyze_video_stream(
+            source=video_path,
+            display=False,
+            process_every_n=process_every_n,
+            stop_after_frames=max_frames
+        ):
+            # Store RGB frame and result
+            processed_frames.append(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+            crowd_results.append(result)
+        
+        cap.release()
+        return processed_frames, crowd_results, duration

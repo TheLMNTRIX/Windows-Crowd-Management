@@ -20,7 +20,7 @@ class Settings:
     
     # Firebase settings
     FIREBASE_STORAGE_BUCKET: str = "techyothon-456411.firebasestorage.app"
-    FIREBASE_SERVICE_ACCOUNT_PATH: str = "techyothon-456411-firebase-adminsdk-fbsvc-87bbf09d02.json"
+    FIREBASE_SERVICE_ACCOUNT_PATH: str = "firebase-credentials.json"
     
     # Logging settings
     LOG_LEVEL: int = logging.INFO

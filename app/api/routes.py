@@ -74,12 +74,15 @@ async def analyze_video(
         # Save the uploaded file
         video_path = VideoProcessor.save_upload_file(file, f"{video_id}.mp4")
         
-        # Extract frames with resizing for faster processing
-        frames, timestamps, duration = VideoProcessor.extract_key_frames(
+        # NEW: Use stream-based video analysis instead of frame extraction
+        frames, crowd_results, duration = VideoProcessor.analyze_video_with_stream(
             video_path, 
-            num_frames=settings.FRAME_SAMPLE_COUNT,
-            resize_factor=0.5  # Resize to 50% for faster processing
+            ai_service,
+            max_frames=settings.FRAME_SAMPLE_COUNT
         )
+        
+        # Calculate timestamps for frames
+        timestamps = [i * (duration / len(frames)) for i in range(len(frames))]
         
         # Save frames as images
         frame_paths = VideoProcessor.save_frames_as_images(frames, video_id)
@@ -96,10 +99,23 @@ async def analyze_video(
             "is_peak_hour_preselected": is_peak
         }
         
+        # Get crowd info from processed results
+        crowd_info = {
+            "crowd_count": str(max(int(r["crowd_count"]) for r in crowd_results)),
+            "crowd_level": str(max(int(r["crowd_level"]) for r in crowd_results))
+        }
+        
         # Run both operations concurrently
-        logger.info("Starting concurrent frame uploads and AI analysis")
+        logger.info("Starting concurrent frame uploads and AI analysis with Gemini")
         upload_task = firebase_service.upload_frames_to_storage_async(frame_paths, video_id)
-        analysis_task = ai_service.analyze_frames_parallel(pil_frames, timestamps, location_context)
+        
+        # Run Gemini analysis with the crowd info from video stream processing
+        analysis_task = ai_service.analyze_frames_with_crowd_info(
+            pil_frames, 
+            timestamps, 
+            location_context,
+            crowd_info
+        )
         
         # Wait for both tasks to complete
         cloud_frame_urls, analysis_result = await asyncio.gather(upload_task, analysis_task)

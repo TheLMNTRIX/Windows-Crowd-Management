@@ -26,13 +26,19 @@ class LivestreamAnalyzer:
         self.cap = None
         self.is_running = False
         self.capture_thread = None
-        self.analysis_thread = None
+        self.display_thread = None  # Add display thread
         self.frame_buffer = queue.Queue()
         self.current_frames = []
         self.current_timestamps = []
         self.start_time = None
         self.session_id = None
         self.chunk_counter = 0
+        self.camera_id = None
+        
+        # For continuous display
+        self.current_frame = None
+        self.frame_lock = threading.Lock()
+        self.latest_analysis = None
         
         # Initialize services
         self.ai_service = AIService()
@@ -65,6 +71,8 @@ class LivestreamAnalyzer:
         self.start_time = time.time()
         self.chunk_counter = 0
         self.location_context = location_context
+        self.camera_id = camera_id
+        self.latest_analysis = None
         
         # Create an initial document in Firestore
         self.firebase_service.db.collection('livestream-analysis').document(self.session_id).set({
@@ -85,16 +93,18 @@ class LivestreamAnalyzer:
             logger.error(f"Failed to open camera with ID {camera_id}")
             raise ValueError(f"Failed to open camera with ID {camera_id}")
         
-        # Start capture thread
+        # Start threads
         self.is_running = True
+        
+        # Start capture thread
         self.capture_thread = threading.Thread(target=self._capture_frames)
         self.capture_thread.daemon = True
         self.capture_thread.start()
         
-        # Start analysis thread
-        self.analysis_thread = threading.Thread(target=self._analyze_chunks)
-        self.analysis_thread.daemon = True
-        self.analysis_thread.start()
+        # Start display thread
+        self.display_thread = threading.Thread(target=self._display_live_feed)
+        self.display_thread.daemon = True
+        self.display_thread.start()
         
         return self.session_id
     
@@ -115,6 +125,9 @@ class LivestreamAnalyzer:
         # Wait for threads to finish
         if self.capture_thread and self.capture_thread.is_alive():
             self.capture_thread.join(timeout=2.0)
+        
+        if self.display_thread and self.display_thread.is_alive():
+            self.display_thread.join(timeout=2.0)
         
         if self.analysis_thread and self.analysis_thread.is_alive():
             self.analysis_thread.join(timeout=2.0)
@@ -167,124 +180,174 @@ class LivestreamAnalyzer:
         return doc.to_dict()
 
     def _capture_frames(self):
-        """Continuously capture frames from the camera in a separate thread"""
+        """Capture frames continuously and process in 30-second chunks"""
         logger.info("Frame capture thread started")
         
-        frame_count = 0
-        fps = self.cap.get(cv2.CAP_PROP_FPS)
-        if fps <= 0:  # If FPS isn't available, estimate it
-            fps = 30
+        chunk_frames = []
+        chunk_timestamps = []
+        chunk_start_time = time.time()
+        current_chunk_number = self.chunk_counter + 1
         
-        # Current analysis results to display
-        current_analysis = {}
+        logger.info(f"Starting to capture chunk {current_chunk_number}")
         
-        while self.is_running and self.cap and self.cap.isOpened():
+        while self.is_running:
+            # Read frame
             ret, frame = self.cap.read()
-            
             if not ret:
-                logger.error("Failed to capture frame from camera")
-                self.is_running = False
-                break
+                logger.error("Failed to capture frame")
+                time.sleep(0.1)
+                continue
             
-            # Calculate timestamp
+            # Update current frame for display thread
+            with self.frame_lock:
+                self.current_frame = frame
+            
+            # Calculate timestamp relative to stream start
             current_time = time.time() - self.start_time
             
-            # Store frames for analysis at reduced rate
-            frame_count += 1
-            if frame_count % int(fps / 5) == 0:  # Store ~5 frames per second for analysis
-                # Convert BGR to RGB for analysis
-                rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                self.current_frames.append(rgb_frame)
-                self.current_timestamps.append(current_time)
+            # Store the frame for chunk processing (sample every few frames for efficiency)
+            if len(chunk_frames) % 6 == 0:  # Assume 30fps, sample at ~5fps
+                chunk_frames.append(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+                chunk_timestamps.append(current_time)
             
-            # Display the frame with a timestamp
-            minutes = int(current_time // 60)
-            seconds = int(current_time % 60)
-            time_text = f"{minutes:02d}:{seconds:02d}"
-            
-            # Get the latest analysis data from Firestore every few seconds
-            if frame_count % int(fps * 3) == 0:  # Update every 3 seconds
-                try:
-                    doc = self.firebase_service.db.collection('livestream-analysis').document(self.session_id).get()
-                    if doc.exists:
-                        data = doc.to_dict()
-                        current_analysis = data.get('latest_analysis', {})
-                except Exception as e:
-                    logger.error(f"Error fetching latest analysis: {str(e)}")
-            
-            # Add colored border based on crowd level
-            border_width = 10
-            if current_analysis:
-                # Define color based on crowd level (BGR format)
-                crowd_level = int(current_analysis.get('crowd_level', 0))
-                intervention_required = current_analysis.get('police_intervention_required', False)
-                
-                if intervention_required:
-                    border_color = (0, 0, 255)  # Red for intervention required
-                elif crowd_level >= 7:
-                    border_color = (0, 140, 255)  # Orange for high crowd
-                elif crowd_level >= 4:
-                    border_color = (0, 255, 255)  # Yellow for medium crowd
-                else:
-                    border_color = (0, 255, 0)    # Green for low crowd
+            # Check if the current chunk duration is complete
+            if (time.time() - chunk_start_time) >= self.analysis_interval:
+                # If we've collected frames
+                if chunk_frames:
+                    logger.info(f"Completed capturing chunk {current_chunk_number} - {len(chunk_frames)} frames")
                     
-                # Add colored border
-                frame = cv2.copyMakeBorder(
-                    frame, 
-                    border_width, border_width, border_width, border_width,
-                    cv2.BORDER_CONSTANT, 
-                    value=border_color
-                )
-            
-            # Add session ID and time to the frame
-            cv2.putText(
-                frame, 
-                f"Session: {self.session_id} | Time: {time_text}", 
-                (10, 30), 
-                cv2.FONT_HERSHEY_SIMPLEX, 
-                0.8, 
-                (255, 255, 255), 
-                2
-            )
-            
-            # Add analysis info if available
-            if current_analysis:
-                crowd_level = current_analysis.get('crowd_level', 'N/A')
-                crowd_count = current_analysis.get('crowd_count', 'N/A')
-                is_peak = 'Yes' if current_analysis.get('is_peak_hour', False) else 'No'
-                
-                y_pos = 70
-                cv2.putText(
-                    frame,
-                    f"Crowd Level: {crowd_level}/10 | Count: {crowd_count} | Peak Hour: {is_peak}",
-                    (10, y_pos),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.7,
-                    (255, 255, 255),
-                    2
-                )
-                
-                # Add police intervention status
-                if current_analysis.get('police_intervention_required', False):
-                    y_pos += 30
-                    cv2.putText(
-                        frame,
-                        "POLICE INTERVENTION REQUIRED",
-                        (10, y_pos),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        0.7,
-                        (0, 0, 255),  # Red color for warning
-                        2
+                    # Increment chunk counter
+                    self.chunk_counter = current_chunk_number
+                    
+                    # Select a subset of frames if there are too many
+                    if len(chunk_frames) > self.frame_sample_rate:
+                        indices = np.linspace(0, len(chunk_frames) - 1, self.frame_sample_rate, dtype=int)
+                        chunk_frames_sample = [chunk_frames[i] for i in indices]
+                        chunk_timestamps_sample = [chunk_timestamps[i] for i in indices]
+                    else:
+                        chunk_frames_sample = chunk_frames
+                        chunk_timestamps_sample = chunk_timestamps
+                    
+                    # Process this chunk in a separate thread
+                    processing_thread = threading.Thread(
+                        target=self._process_and_analyze_chunk,
+                        args=(chunk_frames.copy(), chunk_frames_sample.copy(), chunk_timestamps_sample.copy(), current_chunk_number)
                     )
+                    processing_thread.daemon = True
+                    processing_thread.start()
+                
+                # Start a new chunk
+                chunk_frames = []
+                chunk_timestamps = []
+                chunk_start_time = time.time()
+                current_chunk_number = self.chunk_counter + 1
+                logger.info(f"Starting to capture chunk {current_chunk_number}")
             
-            # Show the frame
-            cv2.imshow('Livestream Analysis', frame)
+            # Brief pause to reduce CPU usage
+            time.sleep(0.01)
+
+    def _process_and_analyze_chunk(self, all_frames, sample_frames, timestamps, chunk_number):
+        """Process, analyze and store chunk data without blocking live display"""
+        try:
+            logger.info(f"Processing chunk {chunk_number} with {len(sample_frames)} sample frames")
             
-            # Check for 'q' key to stop the stream
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                self.is_running = False
-                break
-    
+            # Generate unique ID for this chunk
+            chunk_id = f"{self.session_id}_chunk_{chunk_number}"
+            
+            # Process the sample frames with crowd counter first
+            crowd_results = []
+            for frame in sample_frames:
+                # Process with crowd counter
+                crowd_data = self.ai_service.crowd_counter.count_crowd(frame)
+                crowd_results.append(crowd_data)
+            
+            # Aggregate crowd counting results
+            avg_count = sum(int(result["crowd_count"]) for result in crowd_results) / len(crowd_results)
+            max_level = max(int(result["crowd_level"]) for result in crowd_results)
+            
+            crowd_info = {
+                "crowd_count": str(int(round(avg_count))),
+                "crowd_level": str(max_level)
+            }
+            
+            # Update the latest analysis for display
+            self.latest_analysis = crowd_info
+            
+            # Start deeper analysis and storage in background
+            analysis_thread = threading.Thread(
+                target=self._save_analysis_data,
+                args=(sample_frames, timestamps, chunk_number, chunk_id, crowd_info)
+            )
+            analysis_thread.daemon = True
+            analysis_thread.start()
+            
+        except Exception as e:
+            logger.error(f"Error processing chunk {chunk_number}: {str(e)}")
+
+    def _save_analysis_data(self, frames, timestamps, chunk_number, chunk_id, crowd_info):
+        """Save frames and perform deeper analysis with Gemini"""
+        try:
+            # Save frames as images
+            frame_paths = []
+            for i, frame in enumerate(frames):
+                # Create filename
+                filename = f"{chunk_id}_frame_{i}.jpg"
+                file_path = f"{settings.PROCESSED_DIR}/{filename}"
+                
+                # Save image
+                cv2.imwrite(file_path, cv2.cvtColor(frame, cv2.COLOR_RGB2BGR))
+                
+                # Add to list
+                frame_paths.append(f"/static/processed/{filename}")
+            
+            # Analyze the frames with Gemini AI
+            pil_frames = [Image.fromarray(frame) for frame in frames]
+            
+            # Run analysis asynchronously
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            analysis_result = loop.run_until_complete(
+                self.ai_service.analyze_frames_parallel(pil_frames, timestamps, self.location_context)
+            )
+            loop.close()
+            
+            # Make sure our crowd data is preserved
+            analysis_result["crowd_count"] = crowd_info["crowd_count"]
+            analysis_result["crowd_level"] = crowd_info["crowd_level"]
+            
+            # Upload frames to Firebase Storage
+            storage_loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(storage_loop)
+            cloud_urls = storage_loop.run_until_complete(
+                self.firebase_service.upload_frames_to_storage_async(frame_paths, chunk_id)
+            )
+            storage_loop.close()
+            
+            # Store analysis in Firestore
+            chunk_data = {
+                'chunk_id': chunk_id,
+                'chunk_number': chunk_number,
+                'time_range': {
+                    'start': timestamps[0] if timestamps else 0,
+                    'end': timestamps[-1] if timestamps else 0
+                },
+                'frame_urls': cloud_urls,
+                'analysis': analysis_result,
+                'timestamp': datetime.now().isoformat()
+            }
+            
+            # Update the session document
+            self.firebase_service.db.collection('livestream-analysis').document(self.session_id).update({
+                'chunks': firestore.ArrayUnion([chunk_data]),
+                'latest_analysis': analysis_result,
+                'last_updated': datetime.now().isoformat()
+            })
+            
+            logger.info(f"Completed full analysis of chunk {chunk_number}")
+            
+        except Exception as e:
+            logger.error(f"Error saving analysis data for chunk {chunk_number}: {str(e)}")
+
     def _analyze_chunks(self):
         """Analyze 30-second chunks of the livestream in a separate thread"""
         logger.info("Analysis thread started")
@@ -394,3 +457,54 @@ class LivestreamAnalyzer:
             
         except Exception as e:
             logger.error(f"Error processing analysis for chunk {chunk_number}: {str(e)}")
+
+    def _display_live_feed(self):
+        """Display the live camera feed with the latest analysis overlay"""
+        logger.info("Display thread started")
+        
+        while self.is_running:
+            # Get the current frame
+            with self.frame_lock:
+                if self.current_frame is None:
+                    time.sleep(0.03)
+                    continue
+                frame = self.current_frame.copy()
+            
+            # Add analysis overlay if available
+            if self.latest_analysis:
+                crowd_level = int(self.latest_analysis["crowd_level"])
+                count = self.latest_analysis["crowd_count"]
+                
+                # Add colored border based on crowd level
+                if crowd_level >= 7:
+                    border_color = (0, 0, 255)  # Red for high crowd (BGR)
+                elif crowd_level >= 4:
+                    border_color = (0, 165, 255)  # Orange for medium crowd
+                else:
+                    border_color = (0, 255, 0)  # Green for low crowd
+                
+                # Add border
+                frame = cv2.copyMakeBorder(
+                    frame, 30, 30, 30, 30,
+                    cv2.BORDER_CONSTANT,
+                    value=border_color
+                )
+                
+                # Add text with crowd info
+                cv2.putText(
+                    frame,
+                    f"LIVE | Latest Analysis (Chunk {self.chunk_counter}) | Crowd: {count} | Level: {crowd_level}/10",
+                    (40, 30),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.7,
+                    (255, 255, 255),
+                    2
+                )
+            
+            # Show the frame
+            cv2.imshow("Crowd Analysis (Live)", frame)
+            
+            # Check for exit key
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                self.is_running = False
+                break
