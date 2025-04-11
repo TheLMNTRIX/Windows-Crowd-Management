@@ -109,13 +109,15 @@ class FirebaseService:
             Document ID in Firestore
         """
         try:
-            # Create document with analysis data and frame URLs
+            # Create document with analysis data
             doc_ref = self.db.collection('video-analysis').document(video_id)
             
-            # Add frame URLs to the data
-            analysis_data['frame_urls'] = frame_urls
+            # Ensure frame_urls are in the data if they aren't already
+            if 'frame_urls' not in analysis_data:
+                analysis_data['frame_urls'] = frame_urls
+                
+            # Add server timestamp
             analysis_data['created_at'] = firestore.SERVER_TIMESTAMP
-            analysis_data['video_id'] = video_id
             
             # Save to Firestore
             doc_ref.set(analysis_data)

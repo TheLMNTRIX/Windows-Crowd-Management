@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Livestream & Video Analysis</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Arial', sans-serif;
+        }
+
+        body {
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .subtitle {
+            font-size: 1.2rem;
+            color: #666;
+            margin-bottom: 30px;
+        }
+
+        .sections-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 30px;
+            justify-content: center;
+        }
+
+        .section {
+            flex: 1;
+            min-width: auto;
+            background-color: #fff8ed;
+            border-radius: 33px;
+            overflow: hidden;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            max-height: 1000px;
+        }
+
+        .section:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+        }
+
+        .section-img {
+            width: 100%;
+            height: 450px;
+            object-fit: cover;
+            object-position: center top;
+            display: block;
+        }
+
+        .section-content {
+            padding: 15px;
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .section-desc {
+            color: #666;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+
+        .btn-container {
+            display: flex;
+            justify-content: center;
+        }
+
+        .btn {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background-color: #222;
+            color: white;
+            padding: 12px 25px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            border: none;
+            cursor: pointer;
+            width: 100%;
+            max-width: 200px;
+        }
+
+        .btn:hover {
+            background-color: #444;
+            transform: translateY(-2px);
+        }
+
+        .btn-icon {
+            background-color: #f8c4b4;
+            width: 30px;
+            height: 30px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: 10px;
+        }
+
+        .arrow {
+            border: solid black;
+            border-width: 0 2px 2px 0;
+            display: inline-block;
+            padding: 3px;
+            transform: rotate(-45deg);
+        }
+
+        @media (max-width: 768px) {
+            .sections-container {
+                flex-direction: column;
+            }
+            
+            .section {
+                width: 100%;
+            }
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 999;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .modal-active {
+            opacity: 1;
+        }
+
+        .modal-content {
+            background-color: #fff;
+            margin: 10% auto;
+            padding: 30px;
+            width: 80%;
+            max-width: 600px;
+            border-radius: 15px;
+            position: relative;
+            transform: translateY(-50px);
+            transition: transform 0.3s ease;
+        }
+
+        .modal-active .modal-content {
+            transform: translateY(0);
+        }
+
+        .close-btn {
+            position: absolute;
+            right: 20px;
+            top: 15px;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            color: #666;
+        }
+
+        .modal-title {
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .modal-desc {
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Crowd Analysis and Safety Monitoring System</h1>
+            <!-- <p class="subtitle">Live streaming and advanced video analytics solutions</p> -->
+        </header>
+
+        <div class="sections-container">
+            <!-- Livestream Section -->
+            <div class="section">
+                <img src="./livestream_anal.png" alt="Livestream illustration" class="section-img">
+                <div class="section-content">
+                    <h2 class="section-title">Livestream</h2>
+                    <p class="section-desc">High-quality live streaming with security features and audience analytics. Perfect for events, conferences, and remote presentations.</p>
+                    <div class="btn-container">
+                        <button class="btn" id="livestream-btn">
+                            Livestream 
+                            <span class="btn-icon">
+                                <i class="arrow"></i>
+                            </span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Video Analysis Section -->
+            <div class="section">
+                <img src="./video_anal.png" alt="Video Analysis illustration" class="section-img">
+                <div class="section-content">
+                    <h2 class="section-title">Video Analysis</h2>
+                    <p class="section-desc">Advanced video analytics to monitor crowd density, detect motion, and analyze flow patterns. Ideal for venue management and security.</p>
+                    <div class="btn-container">
+                        <button class="btn" id="analysis-btn">
+                            Video Analysis
+                            <span class="btn-icon">
+                                <i class="arrow"></i>
+                            </span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        // Button elements
+        const livestreamBtn = document.getElementById('livestream-btn');
+        const analysisBtn = document.getElementById('analysis-btn');
+        
+        // Redirect to livestream analysis page
+        livestreamBtn.addEventListener('click', () => {
+            window.location.href = 'livestream_analysis.html';
+        });
+
+        // Redirect to video analysis page
+        analysisBtn.addEventListener('click', () => {
+            window.location.href = 'video_analysis.html';
+        });
+
+        // Button hover effects
+        const buttons = document.querySelectorAll('.btn');
+        buttons.forEach(button => {
+            button.addEventListener('mouseenter', () => {
+                button.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.2)';
+            });
+            
+            button.addEventListener('mouseleave', () => {
+                button.style.boxShadow = 'none';
+            });
+        });
+    </script>
+</body>
+</html>

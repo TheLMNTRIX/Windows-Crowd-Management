@@ -74,7 +74,7 @@ async def analyze_video(
         # Save the uploaded file
         video_path = VideoProcessor.save_upload_file(file, f"{video_id}.mp4")
         
-        # NEW: Use stream-based video analysis instead of frame extraction
+        # Use stream-based video analysis
         frames, crowd_results, duration = VideoProcessor.analyze_video_with_stream(
             video_path, 
             ai_service,
@@ -129,56 +129,40 @@ async def analyze_video(
             video_id
         )
         
-        # Convert raw analysis to AnalysisResponse model
-        analysis = AnalysisResponse(
-            crowd_present=str(analysis_result.get("crowd_present", 0)),
-            crowd_level=str(analysis_result.get("crowd_level", 0)),
-            crowd_count=str(analysis_result.get("crowd_count", 0)),
-            is_peak_hour=str(analysis_result.get("is_peak_hour", 0)),
-            police_intervention_required=str(analysis_result.get("police_intervention_required", 0)),
-            police_intervention_suggestions=analysis_result.get("police_intervention_suggestions", [])
-        )
-        
-        # Create response
-        response = VideoAnalysisResponse(
-            analysis=analysis,
-            original_video_url=f"/static/uploads/{video_id}.mp4",
-            annotated_video_url=f"/static/uploads/{video_id}_annotated.mp4",
-            extracted_frames_urls=frame_paths,
-            video_duration=duration,
-            timestamp=datetime.now().isoformat(),
-            location_latitude=latitude,
-            location_longitude=longitude,
-            location_timestamp=location_timestamp
-        )
+        # Prepare the analysis data structure that will be both stored and returned
+        analysis_data = {
+            "video_id": video_id,
+            "analysis": {
+                "crowd_present": str(analysis_result.get("crowd_present", False)).lower(),
+                "crowd_level": analysis_result.get("crowd_level", "0"),
+                "crowd_count": analysis_result.get("crowd_count", "0"),
+                "is_peak_hour": str(analysis_result.get("is_peak_hour", False)).lower(),
+                "police_intervention_required": str(analysis_result.get("police_intervention_required", False)).lower(),
+                "police_intervention_suggestions": analysis_result.get("police_intervention_suggestions", [])
+            },
+            "location": {
+                "latitude": latitude,
+                "longitude": longitude,
+                "timestamp": location_timestamp
+            },
+            "frame_urls": cloud_frame_urls,
+            "video_duration": duration,
+            "timestamp": datetime.now().isoformat(),
+            "original_video_url": f"/static/uploads/{video_id}.mp4",
+            "annotated_video_url": f"/static/processed/{video_id}_analyzed.mp4"  # Updated path to match what VideoProcessor.create_analysis_video returns
+        }
         
         # Store analysis data in Firestore
         firebase_service.store_analysis_data(
             video_id=video_id,
-            analysis_data={
-                "analysis": {
-                    "crowd_present": analysis.crowd_present,
-                    "crowd_level": analysis.crowd_level,
-                    "crowd_count": analysis.crowd_count,
-                    "is_peak_hour": analysis.is_peak_hour,
-                    "police_intervention_required": analysis.police_intervention_required,
-                    "police_intervention_suggestions": analysis.police_intervention_suggestions,
-                },
-                "location": {
-                    "latitude": latitude,
-                    "longitude": longitude,
-                    "timestamp": location_timestamp
-                },
-                "video_duration": duration,
-                "timestamp": datetime.now().isoformat()
-            },
+            analysis_data=analysis_data.copy(),  # Use a copy to avoid modifying the return data
             frame_urls=cloud_frame_urls
         )
         
         # Remove original file in background task
         background_tasks.add_task(os.remove, video_path)
         
-        return response
+        return analysis_data
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing video: {str(e)}")

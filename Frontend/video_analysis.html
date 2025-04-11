@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crowd Analysis System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Arial', sans-serif;
+        }
+
+        body {
+            background-color: #fef1dd;
+        }
+
+        .container {
+            width: 100%;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .content {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            max-width: 1200px;
+            position: relative;
+            margin-bottom: 20px;
+        }
+
+        .illustration {
+            max-width: 70%;
+        }
+
+        .illustration img {
+            width: auto;
+            height: 680px;
+            display: block;
+        }
+
+        .upload-btn {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background-color: #000;
+            color: white;
+            padding: 16px 28px;
+            border-radius: 12px;
+            text-decoration: none;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            border: none;
+            cursor: pointer;
+            min-width: 220px;
+            font-size: 1.1rem; 
+            position: absolute;
+            right: 150px;
+        }
+
+        .upload-btn:hover {
+            transform: translateY(-2px);
+            background-color: #333;
+        }
+
+        .btn-icon {
+            background-color: #f8c4b4;
+            width: 30px;
+            height: 30px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .arrow-up {
+            border: solid black;
+            border-width: 0 2px 2px 0;
+            display: inline-block;
+            padding: 3px;
+            transform: rotate(-135deg);
+        }
+
+        /* Results container styling */
+        .results-container {
+            display: none;
+            width: 100%;
+            max-width: 1200px;
+            background-color: #fff;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+            margin-top: 30px;
+        }
+
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .results-title {
+            font-size: 24px;
+            color: #333;
+        }
+
+        .analysis-summary {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .analysis-card {
+            background: #f9f9f9;
+            border-radius: 12px;
+            padding: 20px;
+            flex: 1 1 250px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            transition: transform 0.3s ease;
+        }
+
+        .analysis-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .analysis-card h3 {
+            font-size: 18px;
+            margin-bottom: 15px;
+            color: #444;
+        }
+
+        .card-value {
+            font-size: 32px;
+            font-weight: bold;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .card-level {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+
+        .level-high {
+            background-color: #ffebee;
+            color: #d32f2f;
+        }
+
+        .level-medium {
+            background-color: #fff8e1;
+            color: #ff8f00;
+        }
+
+        .level-low {
+            background-color: #e8f5e9;
+            color: #388e3c;
+        }
+
+        .video-section {
+            display: flex;
+            gap: 30px;
+            margin-top: 30px;
+        }
+
+        .video-player {
+            flex: 2;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .video-player video {
+            width: 100%;
+            height: auto;
+            border-radius: 12px;
+        }
+
+        .intervention-suggestions {
+            flex: 1;
+            background-color: #f5f5f5;
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .intervention-suggestions h3 {
+            margin-bottom: 15px;
+            font-size: 18px;
+            color: #444;
+        }
+
+        .intervention-suggestions ul {
+            list-style-type: none;
+        }
+
+        .intervention-suggestions li {
+            margin-bottom: 12px;
+            padding-left: 20px;
+            position: relative;
+        }
+
+        .intervention-suggestions li:before {
+            content: "•";
+            position: absolute;
+            left: 0;
+            color: #d32f2f;
+            font-size: 18px;
+        }
+
+        .frame-gallery {
+            margin-top: 40px;
+            position: relative;
+        }
+
+        .frame-gallery h3 {
+            margin-bottom: 20px;
+            font-size: 18px;
+            color: #444;
+        }
+
+        .image-carousel {
+            display: flex;
+            align-items: center;
+            position: relative;
+        }
+
+        .carousel-container {
+            overflow: hidden;
+            width: 100%;
+            position: relative;
+            border-radius: 12px;
+        }
+
+        .carousel-track {
+            display: flex;
+            transition: transform 0.5s ease-in-out;
+        }
+
+        .carousel-slide {
+            min-width: 100%;
+            height: 400px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .carousel-slide img {
+            max-width: 100%;
+            max-height: 400px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .carousel-button {
+            background-color: #333;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: absolute;
+            cursor: pointer;
+            z-index: 10;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        .carousel-button:hover {
+            background-color: #555;
+        }
+
+        .carousel-button.prev {
+            left: -20px;
+        }
+
+        .carousel-button.next {
+            right: -20px;
+        }
+
+        .carousel-button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+
+        .carousel-indicator {
+            display: flex;
+            justify-content: center;
+            margin-top: 15px;
+        }
+
+        .indicator-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: #ccc;
+            margin: 0 5px;
+            cursor: pointer;
+        }
+
+        .indicator-dot.active {
+            background-color: #333;
+        }
+
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.9);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            display: none;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 768px) {
+            .content {
+                flex-direction: column;
+                gap: 40px;
+            }
+
+            .illustration {
+                max-width: 100%;
+            }
+
+            .upload-btn {
+                position: relative;
+                right: auto;
+                margin-top: 20px;
+            }
+
+            .video-section {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="content">
+            <div class="illustration">
+                <img src="./left_image.png" alt="Video analysis illustration">
+            </div>
+            <button class="upload-btn" id="upload-btn">
+                Upload Video
+                <span class="btn-icon">
+                    <i class="arrow-up"></i>
+                </span>
+            </button>
+            <input type="file" id="video-upload" accept="video/*" style="display: none">
+        </div>
+        
+        <div class="results-container" id="results-container">
+            <div class="results-header">
+                <h2 class="results-title">Video Analysis Results</h2>
+                <p class="video-id">Video ID: <span id="video-id"></span></p>
+            </div>
+            
+            <div class="analysis-summary">
+                <div class="analysis-card">
+                    <h3>Crowd Count</h3>
+                    <span class="card-value" id="crowd-count">--</span>
+                    <p>People detected in the video</p>
+                </div>
+                
+                <div class="analysis-card">
+                    <h3>Crowd Density</h3>
+                    <span class="card-value" id="crowd-level">--</span>
+                    <span class="card-level" id="crowd-level-indicator">Medium</span>
+                    <p>On a scale of 0-10</p>
+                </div>
+                
+                <div class="analysis-card">
+                    <h3>Status</h3>
+                    <span class="card-value" id="peak-hour">--</span>
+                    <p id="intervention-required">Police intervention: No</p>
+                </div>
+            </div>
+            
+            <div class="video-section">
+                <div class="video-player">
+                    <video id="analyzed-video" controls style="width: 100%; height: auto;">
+                        Your browser does not support the video tag.
+                    </video>
+                </div>
+                
+                <div class="intervention-suggestions">
+                    <h3>Intervention Suggestions</h3>
+                    <ul id="suggestions-list">
+                        <li>Loading suggestions...</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="frame-gallery">
+                <h3>Key Frames</h3>
+                <div class="image-carousel">
+                    <button class="carousel-button prev" id="prev-btn">❮</button>
+                    <div class="carousel-container">
+                        <div class="carousel-track" id="carousel-track">
+                            <!-- Images will be added here -->
+                        </div>
+                    </div>
+                    <button class="carousel-button next" id="next-btn">❯</button>
+                </div>
+                <div class="carousel-indicator" id="carousel-indicator">
+                    <!-- Dots will be added here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="loading-overlay" id="loading-overlay">
+        <div class="spinner"></div>
+        <p>Analyzing video... This may take a few moments.</p>
+    </div>
+
+    <script>
+        // DOM elements
+        const uploadBtn = document.getElementById('upload-btn');
+        const fileInput = document.getElementById('video-upload');
+        const resultsContainer = document.getElementById('results-container');
+        const loadingOverlay = document.getElementById('loading-overlay');
+        
+        // Carousel elements
+        const carouselTrack = document.getElementById('carousel-track');
+        const carouselIndicator = document.getElementById('carousel-indicator');
+        const prevButton = document.getElementById('prev-btn');
+        const nextButton = document.getElementById('next-btn');
+        
+        let currentSlide = 0;
+        let slideCount = 0;
+        
+        // Event Listeners
+        uploadBtn.addEventListener('click', () => {
+            fileInput.click();
+        });
+        
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                const file = e.target.files[0];
+                if (file.type.startsWith('video/')) {
+                    uploadVideo(file);
+                } else {
+                    alert('Please select a valid video file');
+                }
+            }
+        });
+        
+        // Upload and analyze video
+        function uploadVideo(file) {
+            // Show loading overlay
+            loadingOverlay.style.display = 'flex';
+            
+            // Check content type
+            if (!file.type.startsWith('video/')) {
+                loadingOverlay.style.display = 'none';
+                alert('Please select a valid video file');
+                return;
+            }
+            
+            // Create a URL for the uploaded video file
+            const videoURL = URL.createObjectURL(file);
+            
+            // Set the video source directly on the video element (not on the source tag)
+            const videoElement = document.getElementById('analyzed-video');
+            videoElement.src = videoURL;
+            
+            // Add event listeners to debug video loading
+            videoElement.onloadeddata = () => console.log('Video data loaded successfully');
+            videoElement.onerror = (e) => console.error('Error loading video:', e);
+            
+            videoElement.load();
+            
+            // Create FormData object
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            // Add latitude and longitude as query parameters in the URL
+            const latitude = 15.596477;
+            const longitude = 73.796099;
+            const url = `http://localhost:8000/api/v1/analyze-video/?latitude=${latitude}&longitude=${longitude}`;
+            
+            // Rest of your function remains the same...
+            fetch(url, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                console.log('Response status:', response.status);
+                
+                if (!response.ok) {
+                    return response.text().then(errorText => {
+                        console.error('Server error response:', errorText);
+                        throw new Error(`Server returned ${response.status}: ${errorText}`);
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                // Hide loading overlay
+                loadingOverlay.style.display = 'none';
+                console.log('Received data:', data);
+                
+                // Display results
+                displayResults(data, videoURL);  // Pass videoURL to the displayResults function
+            })
+            .catch(error => {
+                loadingOverlay.style.display = 'none';
+                alert('Error analyzing video: ' + error.message);
+                console.error('Error details:', error);
+            });
+        }
+        
+        // Display analysis results
+        function displayResults(data, videoURL) {
+            console.log('Analysis data:', data);
+            
+            // Set basic data
+            document.getElementById('video-id').textContent = data.video_id;
+            document.getElementById('crowd-count').textContent = data.analysis.crowd_count;
+            document.getElementById('crowd-level').textContent = data.analysis.crowd_level + '/10';
+            
+            // Set crowd level indicator
+            const crowdLevel = parseInt(data.analysis.crowd_level);
+            const levelIndicator = document.getElementById('crowd-level-indicator');
+            
+            levelIndicator.className = 'card-level';
+            if (crowdLevel >= 7) {
+                levelIndicator.classList.add('level-high');
+                levelIndicator.textContent = 'High';
+            } else if (crowdLevel >= 4) {
+                levelIndicator.classList.add('level-medium');
+                levelIndicator.textContent = 'Medium';
+            } else {
+                levelIndicator.classList.add('level-low');
+                levelIndicator.textContent = 'Low';
+            }
+            
+            // Set peak hour status
+            document.getElementById('peak-hour').textContent = data.analysis.is_peak_hour === 'true' ? 'Peak Hour' : 'Non-Peak Hour';
+            
+            // Set intervention status
+            const interventionRequired = data.analysis.police_intervention_required === 'true';
+            document.getElementById('intervention-required').textContent = 'Police intervention: ' + (interventionRequired ? 'Yes' : 'No');
+            
+            // Set intervention suggestions
+            const suggestionsList = document.getElementById('suggestions-list');
+            suggestionsList.innerHTML = '';
+
+            // Check if suggestions exist, regardless of the intervention required flag
+            if (data.analysis.police_intervention_suggestions && 
+                data.analysis.police_intervention_suggestions.length > 0) {
+                
+                data.analysis.police_intervention_suggestions.forEach(suggestion => {
+                    const li = document.createElement('li');
+                    li.textContent = suggestion;
+                    suggestionsList.appendChild(li);
+                });
+            } else {
+                const li = document.createElement('li');
+                li.textContent = 'No intervention suggestions available.';
+                suggestionsList.appendChild(li);
+            }
+            
+            // We don't need to set the video source again because we already did it in uploadVideo
+            
+            // Create image carousel
+            createImageCarousel(data.frame_urls);
+            
+            // Show results container
+            resultsContainer.style.display = 'block';
+            
+            // Scroll to results
+            resultsContainer.scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        // Create image carousel
+        function createImageCarousel(imageUrls) {
+            carouselTrack.innerHTML = '';
+            carouselIndicator.innerHTML = '';
+            
+            slideCount = imageUrls.length;
+            currentSlide = 0;
+            
+            // Create slides
+            imageUrls.forEach((url, index) => {
+                // Create slide
+                const slide = document.createElement('div');
+                slide.className = 'carousel-slide';
+                
+                // Create image
+                const img = document.createElement('img');
+                img.src = url;
+                img.alt = `Frame ${index + 1}`;
+                
+                // Add image to slide
+                slide.appendChild(img);
+                
+                // Add slide to track
+                carouselTrack.appendChild(slide);
+                
+                // Create indicator dot
+                const dot = document.createElement('div');
+                dot.className = 'indicator-dot';
+                if (index === 0) dot.classList.add('active');
+                
+                // Add click event to dot
+                dot.addEventListener('click', () => {
+                    goToSlide(index);
+                });
+                
+                // Add dot to indicator
+                carouselIndicator.appendChild(dot);
+            });
+            
+            // Set initial transform
+            updateCarousel();
+            
+            // Add button event listeners
+            prevButton.addEventListener('click', () => {
+                if (currentSlide > 0) {
+                    currentSlide--;
+                    updateCarousel();
+                }
+            });
+            
+            nextButton.addEventListener('click', () => {
+                if (currentSlide < slideCount - 1) {
+                    currentSlide++;
+                    updateCarousel();
+                }
+            });
+        }
+        
+        // Update carousel position
+        function updateCarousel() {
+            carouselTrack.style.transform = `translateX(-${currentSlide * 100}%)`;
+            
+            // Update dots
+            const dots = carouselIndicator.querySelectorAll('.indicator-dot');
+            dots.forEach((dot, index) => {
+                if (index === currentSlide) {
+                    dot.classList.add('active');
+                } else {
+                    dot.classList.remove('active');
+                }
+            });
+            
+            // Update button states
+            prevButton.disabled = currentSlide === 0;
+            nextButton.disabled = currentSlide === slideCount - 1;
+        }
+        
+        // Go to specific slide
+        function goToSlide(index) {
+            currentSlide = index;
+            updateCarousel();
+        }
+    </script>
+</body>
+</html>
+

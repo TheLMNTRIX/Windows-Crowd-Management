@@ -189,23 +189,23 @@ class CrowdCounter:
         """Map raw count to crowd level from 0-10"""
         if count <= 0:
             return 0
-        elif count <= 5:
-            return 1
         elif count <= 10:
-            return 2
+            return 1
         elif count <= 20:
-            return 3
+            return 2
         elif count <= 30:
+            return 3
+        elif count <= 40:
             return 4
-        elif count <= 50:
+        elif count <= 60:
             return 5
-        elif count <= 80:
-            return 6
         elif count <= 120:
+            return 6
+        elif count <= 180:
             return 7
-        elif count <= 200:
+        elif count <= 250:
             return 8
-        elif count <= 300:
+        elif count <= 350:
             return 9
         else:
             return 10
