@@ -129,9 +129,6 @@ class LivestreamAnalyzer:
         if self.display_thread and self.display_thread.is_alive():
             self.display_thread.join(timeout=2.0)
         
-        if self.analysis_thread and self.analysis_thread.is_alive():
-            self.analysis_thread.join(timeout=2.0)
-        
         # Release camera
         if self.cap and self.cap.isOpened():
             self.cap.release()

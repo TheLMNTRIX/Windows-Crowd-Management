@@ -14,6 +14,10 @@ def test_camera(camera_id=0, display_time=10):
     # Initialize camera
     cap = cv2.VideoCapture(camera_id)
     
+    # Set resolution to 720p
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+    
     if not cap.isOpened():
         print(f"Failed to open camera with ID {camera_id}")
         return
@@ -52,7 +56,7 @@ def test_camera(camera_id=0, display_time=10):
 
 if __name__ == "__main__":
     # Test default camera (ID 0)
-    test_camera(0)
+    test_camera(1)
     
     # Uncomment to test other cameras
     # test_camera(1)
